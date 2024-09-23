@@ -3,6 +3,10 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+repositories {
+    jcenter() // If not already there
+}
+
 android {
     namespace = "com.v2ray.ang"
     compileSdk = 34
@@ -110,7 +114,8 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("io.reactivex:rxjava:1.3.8")
     implementation("io.reactivex:rxandroid:1.2.1")
-    implementation("com.tbruyelle.rxpermissions:rxpermissions:0.9.4@aar")
+    // implementation("com.tbruyelle.rxpermissions:rxpermissions:0.9.4@aar")
+	compile 'com.tbruyelle.rxpermissions:rxpermissions:0.9.4@aar'
     implementation("com.github.jorgecastilloprz:fabprogresscircle:1.01@aar")
     implementation("me.drakeet.support:toastcompat:1.1.0")
     implementation("com.blacksquircle.ui:editorkit:2.9.0")
