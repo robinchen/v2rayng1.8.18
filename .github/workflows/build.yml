@@ -7,7 +7,8 @@ on:
       XRAY_CORE_VERSION:
         description: 'Xray core version or commit hash'
         default: 'v1.8.9'
-        required: false
+        type: string
+        required: true
 
 
 jobs:
