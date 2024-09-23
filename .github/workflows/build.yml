@@ -6,9 +6,7 @@ on:
     inputs:
       XRAY_CORE_VERSION:
         description: 'Xray core version or commit hash'
-        default: 'v1.8.9'
-        type: string
-        required: true
+        required: false
 
 
 jobs:
@@ -32,7 +30,7 @@ jobs:
 
     - name: Install gomobile
       run: |
-        go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20240806205939-81131f6468ab
+        go install golang.org/x/mobile/cmd/gomobile@latest
         echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
 
@@ -44,7 +42,7 @@ jobs:
       run: |
         mkdir ${{ github.workspace }}/build
         cd ${{ github.workspace }}/build
-        git clone --depth=1 -b 1.8.11 https://github.com/2dust/AndroidLibXrayLite.git
+        git clone --depth=1 -b main https://github.com/2dust/AndroidLibXrayLite.git
         cd AndroidLibXrayLite
         go get github.com/xtls/xray-core@${{ github.event.inputs.XRAY_CORE_VERSION }} || true
         gomobile init
