@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       XRAY_CORE_VERSION:
-        description: 'Xray core version or commit hash'
+        description: 'v1.8.9'
         required: false
 
 
