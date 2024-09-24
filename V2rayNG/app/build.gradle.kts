@@ -5,15 +5,11 @@ plugins {
 
 buildscript {
     repositories{
-	    google()
-		mavenCentral()
 	    jcenter()
 	}
 }
 
 repositories {
-    google()
-	mavenCentral()
 	jcenter()
 }
 
