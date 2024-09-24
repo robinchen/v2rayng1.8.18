@@ -3,6 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+allprojects {
+	repositories {
+		jcenter()
+		maven { url "https://jitpack.io" }
+	}
+}
 
 android {
     namespace = "com.v2ray.ang"
