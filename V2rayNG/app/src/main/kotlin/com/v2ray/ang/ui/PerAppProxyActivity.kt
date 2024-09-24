@@ -8,9 +8,9 @@ import android.view.MenuItem
 import android.view.View
 import androidx.appcompat.widget.SearchView
 import androidx.lifecycle.lifecycleScope
-import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.tencent.mmkv.MMKV
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.ANG_PACKAGE
 import com.v2ray.ang.R
@@ -19,59 +19,59 @@ import com.v2ray.ang.dto.AppInfo
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.v2RayApplication
 import com.v2ray.ang.util.AppManagerUtil
+import com.v2ray.ang.util.MmkvManager
 import com.v2ray.ang.util.Utils
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import rx.android.schedulers.AndroidSchedulers
-import rx.schedulers.Schedulers
 import java.text.Collator
-import java.util.*
 
 class PerAppProxyActivity : BaseActivity() {
-    private lateinit var binding: ActivityBypassListBinding
+    private val binding by lazy {
+        ActivityBypassListBinding.inflate(layoutInflater)
+    }
 
     private var adapter: PerAppProxyAdapter? = null
     private var appsAll: List<AppInfo>? = null
-    private val defaultSharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
+    private val settingsStorage by lazy { MMKV.mmkvWithID(MmkvManager.ID_SETTING, MMKV.MULTI_PROCESS_MODE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityBypassListBinding.inflate(layoutInflater)
-        val view = binding.root
-        setContentView(view)
+        setContentView(binding.root)
 
         val dividerItemDecoration = DividerItemDecoration(this, LinearLayoutManager.VERTICAL)
         binding.recyclerView.addItemDecoration(dividerItemDecoration)
 
-        val blacklist = defaultSharedPreferences.getStringSet(AppConfig.PREF_PER_APP_PROXY_SET, null)
+        val blacklist = settingsStorage?.decodeStringSet(AppConfig.PREF_PER_APP_PROXY_SET)
 
         AppManagerUtil.rxLoadNetworkAppList(this)
-                .subscribeOn(Schedulers.io())
-                .map {
-                    if (blacklist != null) {
-                        it.forEach { one ->
-                            if (blacklist.contains(one.packageName)) {
-                                one.isSelected = 1
-                            } else {
-                                one.isSelected = 0
-                            }
+            .subscribeOn(Schedulers.io())
+            .map {
+                if (blacklist != null) {
+                    it.forEach { one ->
+                        if (blacklist.contains(one.packageName)) {
+                            one.isSelected = 1
+                        } else {
+                            one.isSelected = 0
                         }
-                        val comparator = Comparator<AppInfo> { p1, p2 ->
-                            when {
-                                p1.isSelected > p2.isSelected -> -1
-                                p1.isSelected == p2.isSelected -> 0
-                                else -> 1
-                            }
-                        }
-                        it.sortedWith(comparator)
-                    } else {
-                        val comparator = object : Comparator<AppInfo> {
-                            val collator = Collator.getInstance()
-                            override fun compare(o1: AppInfo, o2: AppInfo) = collator.compare(o1.appName, o2.appName)
-                        }
-                        it.sortedWith(comparator)
                     }
+                    val comparator = Comparator<AppInfo> { p1, p2 ->
+                        when {
+                            p1.isSelected > p2.isSelected -> -1
+                            p1.isSelected == p2.isSelected -> 0
+                            else -> 1
+                        }
+                    }
+                    it.sortedWith(comparator)
+                } else {
+                    val comparator = object : Comparator<AppInfo> {
+                        val collator = Collator.getInstance()
+                        override fun compare(o1: AppInfo, o2: AppInfo) = collator.compare(o1.appName, o2.appName)
+                    }
+                    it.sortedWith(comparator)
                 }
+            }
 //                .map {
 //                    val comparator = object : Comparator<AppInfo> {
 //                        val collator = Collator.getInstance()
@@ -79,13 +79,13 @@ class PerAppProxyActivity : BaseActivity() {
 //                    }
 //                    it.sortedWith(comparator)
 //                }
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe {
-                    appsAll = it
-                    adapter = PerAppProxyAdapter(this, it, blacklist)
-                    binding.recyclerView.adapter = adapter
-                    binding.pbWaiting.visibility = View.GONE
-                }
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe {
+                appsAll = it
+                adapter = PerAppProxyAdapter(this, it, blacklist)
+                binding.recyclerView.adapter = adapter
+                binding.pbWaiting.visibility = View.GONE
+            }
         /***
         recycler_view.addOnScrollListener(object : RecyclerView.OnScrollListener() {
         var dst = 0
@@ -134,14 +134,14 @@ class PerAppProxyActivity : BaseActivity() {
          ***/
 
         binding.switchPerAppProxy.setOnCheckedChangeListener { _, isChecked ->
-            defaultSharedPreferences.edit().putBoolean(AppConfig.PREF_PER_APP_PROXY, isChecked).apply()
+            settingsStorage.encode(AppConfig.PREF_PER_APP_PROXY, isChecked)
         }
-        binding.switchPerAppProxy.isChecked = defaultSharedPreferences.getBoolean(AppConfig.PREF_PER_APP_PROXY, false)
+        binding.switchPerAppProxy.isChecked = settingsStorage.getBoolean(AppConfig.PREF_PER_APP_PROXY, false)
 
         binding.switchBypassApps.setOnCheckedChangeListener { _, isChecked ->
-            defaultSharedPreferences.edit().putBoolean(AppConfig.PREF_BYPASS_APPS, isChecked).apply()
+            settingsStorage.encode(AppConfig.PREF_BYPASS_APPS, isChecked)
         }
-        binding.switchBypassApps.isChecked = defaultSharedPreferences.getBoolean(AppConfig.PREF_BYPASS_APPS, false)
+        binding.switchBypassApps.isChecked = settingsStorage.getBoolean(AppConfig.PREF_BYPASS_APPS, false)
 
         /***
         et_search.setOnEditorActionListener { v, actionId, event ->
@@ -177,7 +177,7 @@ class PerAppProxyActivity : BaseActivity() {
     override fun onPause() {
         super.onPause()
         adapter?.let {
-            defaultSharedPreferences.edit().putStringSet(AppConfig.PREF_PER_APP_PROXY_SET, it.blacklist).apply()
+            settingsStorage.encode(AppConfig.PREF_PER_APP_PROXY_SET, it.blacklist)
         }
     }
 
@@ -188,12 +188,10 @@ class PerAppProxyActivity : BaseActivity() {
         if (searchItem != null) {
             val searchView = searchItem.actionView as SearchView
             searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-                override fun onQueryTextSubmit(query: String?): Boolean {
-                    return false
-                }
+                override fun onQueryTextSubmit(query: String?): Boolean = false
 
                 override fun onQueryTextChange(newText: String?): Boolean {
-                    filterProxyApp(newText!!)
+                    filterProxyApp(newText.orEmpty())
                     return false
                 }
             })
@@ -209,29 +207,33 @@ class PerAppProxyActivity : BaseActivity() {
             if (it.blacklist.containsAll(pkgNames)) {
                 it.apps.forEach {
                     val packageName = it.packageName
-                    adapter?.blacklist!!.remove(packageName)
+                    adapter?.blacklist?.remove(packageName)
                 }
             } else {
                 it.apps.forEach {
                     val packageName = it.packageName
-                    adapter?.blacklist!!.add(packageName)
+                    adapter?.blacklist?.add(packageName)
                 }
             }
             it.notifyDataSetChanged()
             true
         } ?: false
+
         R.id.select_proxy_app -> {
             selectProxyApp()
             true
         }
+
         R.id.import_proxy_app -> {
             importProxyApp()
             true
         }
+
         R.id.export_proxy_app -> {
             exportProxyApp()
             true
         }
+
         else -> super.onOptionsItemSelected(item)
     }
 
@@ -250,9 +252,7 @@ class PerAppProxyActivity : BaseActivity() {
 
     private fun importProxyApp() {
         val content = Utils.getClipboard(applicationContext)
-        if (TextUtils.isEmpty(content)) {
-            return
-        }
+        if (TextUtils.isEmpty(content)) return
         selectProxyApp(content, false)
         toast(R.string.toast_success)
     }
@@ -274,11 +274,9 @@ class PerAppProxyActivity : BaseActivity() {
             } else {
                 content
             }
-            if (TextUtils.isEmpty(proxyApps)) {
-                return false
-            }
+            if (TextUtils.isEmpty(proxyApps)) return false
 
-            adapter?.blacklist!!.clear()
+            adapter?.blacklist?.clear()
 
             if (binding.switchBypassApps.isChecked) {
                 adapter?.let {
@@ -286,7 +284,7 @@ class PerAppProxyActivity : BaseActivity() {
                         val packageName = it.packageName
                         Log.d(ANG_PACKAGE, packageName)
                         if (!inProxyApps(proxyApps, packageName, force)) {
-                            adapter?.blacklist!!.add(packageName)
+                            adapter?.blacklist?.add(packageName)
                             println(packageName)
                             return@block
                         }
@@ -299,7 +297,7 @@ class PerAppProxyActivity : BaseActivity() {
                         val packageName = it.packageName
                         Log.d(ANG_PACKAGE, packageName)
                         if (inProxyApps(proxyApps, packageName, force)) {
-                            adapter?.blacklist!!.add(packageName)
+                            adapter?.blacklist?.add(packageName)
                             println(packageName)
                             return@block
                         }
@@ -316,12 +314,8 @@ class PerAppProxyActivity : BaseActivity() {
 
     private fun inProxyApps(proxyApps: String, packageName: String, force: Boolean): Boolean {
         if (force) {
-            if (packageName == "com.google.android.webview") {
-                return false
-            }
-            if (packageName.startsWith("com.google")) {
-                return true
-            }
+            if (packageName == "com.google.android.webview") return false
+            if (packageName.startsWith("com.google")) return true
         }
 
         return proxyApps.indexOf(packageName) >= 0
@@ -334,7 +328,8 @@ class PerAppProxyActivity : BaseActivity() {
         if (key.isNotEmpty()) {
             appsAll?.forEach {
                 if (it.appName.uppercase().indexOf(key) >= 0
-                        || it.packageName.uppercase().indexOf(key) >= 0) {
+                    || it.packageName.uppercase().indexOf(key) >= 0
+                ) {
                     apps.add(it)
                 }
             }

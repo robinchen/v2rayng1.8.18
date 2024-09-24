@@ -2,26 +2,31 @@ package com.v2ray.ang.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
-import android.view.*
+import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View.GONE
 import android.view.View.VISIBLE
+import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
-import com.tbruyelle.rxpermissions.RxPermissions
+import com.tbruyelle.rxpermissions3.RxPermissions
 import com.tencent.mmkv.MMKV
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivitySubSettingBinding
 import com.v2ray.ang.databinding.ItemRecyclerUserAssetBinding
+import com.v2ray.ang.databinding.LayoutProgressBinding
 import com.v2ray.ang.dto.AssetUrlItem
 import com.v2ray.ang.extension.toTrafficString
 import com.v2ray.ang.extension.toast
@@ -36,10 +41,10 @@ import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.URL
 import java.text.DateFormat
-import java.util.*
+import java.util.Date
 
 class UserAssetActivity : BaseActivity() {
-    private lateinit var binding: ActivitySubSettingBinding
+    private val binding by lazy { ActivitySubSettingBinding.inflate(layoutInflater) }
     private val settingsStorage by lazy { MMKV.mmkvWithID(MmkvManager.ID_SETTING, MMKV.MULTI_PROCESS_MODE) }
     private val assetStorage by lazy { MMKV.mmkvWithID(MmkvManager.ID_ASSET, MMKV.MULTI_PROCESS_MODE) }
 
@@ -49,9 +54,7 @@ class UserAssetActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivitySubSettingBinding.inflate(layoutInflater)
-        val view = binding.root
-        setContentView(view)
+        setContentView(binding.root)
         title = getString(R.string.title_user_asset_setting)
 
         binding.recyclerView.setHasFixedSize(true)
@@ -80,6 +83,7 @@ class UserAssetActivity : BaseActivity() {
             startActivity(intent)
             true
         }
+
         R.id.download_file -> {
             downloadGeoFiles()
             true
@@ -97,24 +101,24 @@ class UserAssetActivity : BaseActivity() {
         RxPermissions(this)
             .request(permission)
             .subscribe {
-            if (it) {
-                val intent = Intent(Intent.ACTION_GET_CONTENT)
-                intent.type = "*/*"
-                intent.addCategory(Intent.CATEGORY_OPENABLE)
+                if (it) {
+                    val intent = Intent(Intent.ACTION_GET_CONTENT)
+                    intent.type = "*/*"
+                    intent.addCategory(Intent.CATEGORY_OPENABLE)
 
-                try {
-                    chooseFile.launch(
-                        Intent.createChooser(
-                            intent,
-                            getString(R.string.title_file_chooser)
+                    try {
+                        chooseFile.launch(
+                            Intent.createChooser(
+                                intent,
+                                getString(R.string.title_file_chooser)
+                            )
                         )
-                    )
-                } catch (ex: android.content.ActivityNotFoundException) {
-                    toast(R.string.toast_require_file_manager)
-                }
-            } else
-                toast(R.string.toast_permission_denied)
-        }
+                    } catch (ex: android.content.ActivityNotFoundException) {
+                        toast(R.string.toast_require_file_manager)
+                    }
+                } else
+                    toast(R.string.toast_permission_denied)
+            }
     }
 
     private val chooseFile =
@@ -168,16 +172,23 @@ class UserAssetActivity : BaseActivity() {
     }
 
     private fun downloadGeoFiles() {
-        val httpPort = Utils.parseInt(settingsStorage?.decodeString(AppConfig.PREF_HTTP_PORT), AppConfig.PORT_HTTP.toInt())
-
+        val dialog = AlertDialog.Builder(this)
+            .setView(LayoutProgressBinding.inflate(layoutInflater).root)
+            .setCancelable(false)
+            .show()
         toast(R.string.msg_downloading_content)
+
+        val httpPort = Utils.parseInt(settingsStorage?.decodeString(AppConfig.PREF_HTTP_PORT), AppConfig.PORT_HTTP.toInt())
         var assets = MmkvManager.decodeAssetUrls()
         assets = addBuiltInGeoItems(assets)
 
         assets.forEach {
             //toast(getString(R.string.msg_downloading_content) + it)
             lifecycleScope.launch(Dispatchers.IO) {
-                val result = downloadGeo(it.second, 60000, httpPort)
+                var result = downloadGeo(it.second, 60000, httpPort)
+                if (!result) {
+                    result = downloadGeo(it.second, 60000, 0)
+                }
                 launch(Dispatchers.Main) {
                     if (result) {
                         toast(getString(R.string.toast_success) + " " + it.second.remarks)
@@ -185,6 +196,7 @@ class UserAssetActivity : BaseActivity() {
                     } else {
                         toast(getString(R.string.toast_failure) + " " + it.second.remarks)
                     }
+                    dialog.dismiss()
                 }
             }
         }
@@ -197,12 +209,16 @@ class UserAssetActivity : BaseActivity() {
         //Log.d(AppConfig.ANG_PACKAGE, url)
 
         try {
-            conn = URL(item.url).openConnection(
-                Proxy(
-                    Proxy.Type.HTTP,
-                    InetSocketAddress("127.0.0.1", httpPort)
-                )
-            ) as HttpURLConnection
+            conn = if (httpPort == 0) {
+                URL(item.url).openConnection() as HttpURLConnection
+            } else {
+                URL(item.url).openConnection(
+                    Proxy(
+                        Proxy.Type.HTTP,
+                        InetSocketAddress("127.0.0.1", httpPort)
+                    )
+                ) as HttpURLConnection
+            }
             conn.connectTimeout = timeout
             conn.readTimeout = timeout
             val inputStream = conn.inputStream
@@ -222,15 +238,19 @@ class UserAssetActivity : BaseActivity() {
             conn?.disconnect()
         }
     }
+
     private fun addBuiltInGeoItems(assets: List<Pair<String, AssetUrlItem>>): List<Pair<String, AssetUrlItem>> {
         val list = mutableListOf<Pair<String, AssetUrlItem>>()
-        builtInGeoFiles.forEach {
-            list.add(Utils.getUuid() to AssetUrlItem(
-                it,
-                AppConfig.geoUrl + it
-            )
-            )
-        }
+        builtInGeoFiles
+            .filter { geoFile -> assets.none { it.second.remarks == geoFile } }
+            .forEach {
+                list.add(
+                    Utils.getUuid() to AssetUrlItem(
+                        it,
+                        AppConfig.GeoUrl + it
+                    )
+                )
+            }
 
         return list + assets
     }
@@ -241,14 +261,15 @@ class UserAssetActivity : BaseActivity() {
                 ItemRecyclerUserAssetBinding.inflate(
                     LayoutInflater.from(parent.context),
                     parent,
-                    false)
+                    false
+                )
             )
         }
 
         @SuppressLint("SetTextI18n")
         override fun onBindViewHolder(holder: UserAssetViewHolder, position: Int) {
-            var assets = MmkvManager.decodeAssetUrls();
-            assets = addBuiltInGeoItems(assets);
+            var assets = MmkvManager.decodeAssetUrls()
+            assets = addBuiltInGeoItems(assets)
             val item = assets.getOrNull(position) ?: return
 //            file with name == item.second.remarks
             val file = extDir.listFiles()?.find { it.name == item.second.remarks }
@@ -263,7 +284,7 @@ class UserAssetActivity : BaseActivity() {
                 holder.itemUserAssetBinding.assetProperties.text = getString(R.string.msg_file_not_found)
             }
 
-            if (item.second.remarks in builtInGeoFiles) {
+            if (item.second.remarks in builtInGeoFiles && item.second.url == AppConfig.GeoUrl + item.second.remarks) {
                 holder.itemUserAssetBinding.layoutEdit.visibility = GONE
                 holder.itemUserAssetBinding.layoutRemove.visibility = GONE
             } else {
@@ -284,8 +305,8 @@ class UserAssetActivity : BaseActivity() {
         }
 
         override fun getItemCount(): Int {
-            var assets = MmkvManager.decodeAssetUrls();
-            assets = addBuiltInGeoItems(assets);
+            var assets = MmkvManager.decodeAssetUrls()
+            assets = addBuiltInGeoItems(assets)
             return assets.size
         }
     }
