@@ -1,13 +1,17 @@
 package com.v2ray.ang.dto
 
+import com.v2ray.ang.AppConfig
+
+
 enum class EConfigType(val value: Int, val protocolScheme: String) {
-    VMESS(1, "vmess://"),
-    CUSTOM(2, ""),
-    SHADOWSOCKS(3, "ss://"),
-    SOCKS(4, "socks://"),
-    VLESS(5, "vless://"),
-    TROJAN(6, "trojan://"),
-    WIREGUARD(7, "wireguard://");
+    VMESS(1, AppConfig.VMESS),
+    CUSTOM(2, AppConfig.CUSTOM),
+    SHADOWSOCKS(3, AppConfig.SHADOWSOCKS),
+    SOCKS(4, AppConfig.SOCKS),
+    VLESS(5, AppConfig.VLESS),
+    TROJAN(6, AppConfig.TROJAN),
+    WIREGUARD(7, AppConfig.WIREGUARD),
+    HTTP(10, AppConfig.HTTP);
 
     companion object {
         fun fromInt(value: Int) = values().firstOrNull { it.value == value }

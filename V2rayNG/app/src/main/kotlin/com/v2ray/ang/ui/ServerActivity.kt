@@ -5,9 +5,13 @@ import android.text.TextUtils
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.*
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.Spinner
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
-import com.tencent.mmkv.MMKV
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.PREF_ALLOW_INSECURE
 import com.v2ray.ang.AppConfig.WIREGUARD_LOCAL_ADDRESS_V4
@@ -22,25 +26,17 @@ import com.v2ray.ang.dto.V2rayConfig.Companion.TLS
 import com.v2ray.ang.extension.removeWhiteSpace
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.util.MmkvManager
-import com.v2ray.ang.util.MmkvManager.ID_MAIN
-import com.v2ray.ang.util.MmkvManager.KEY_SELECTED_SERVER
+import com.v2ray.ang.util.MmkvManager.settingsStorage
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.util.Utils.getIpv6Address
 
 class ServerActivity : BaseActivity() {
 
-    private val mainStorage by lazy { MMKV.mmkvWithID(ID_MAIN, MMKV.MULTI_PROCESS_MODE) }
-    private val settingsStorage by lazy {
-        MMKV.mmkvWithID(
-            MmkvManager.ID_SETTING,
-            MMKV.MULTI_PROCESS_MODE
-        )
-    }
     private val editGuid by lazy { intent.getStringExtra("guid").orEmpty() }
     private val isRunning by lazy {
         intent.getBooleanExtra("isRunning", false)
                 && editGuid.isNotEmpty()
-                && editGuid == mainStorage?.decodeString(KEY_SELECTED_SERVER)
+                && editGuid == MmkvManager.getSelectServer()
     }
     private val createConfigType by lazy {
         EConfigType.fromInt(intent.getIntExtra("createConfigType", EConfigType.VMESS.value))
@@ -105,7 +101,9 @@ class ServerActivity : BaseActivity() {
     private val sp_network: Spinner? by lazy { findViewById(R.id.sp_network) }
     private val sp_header_type: Spinner? by lazy { findViewById(R.id.sp_header_type) }
     private val sp_header_type_title: TextView? by lazy { findViewById(R.id.sp_header_type_title) }
+    private val tv_request_host: TextView? by lazy { findViewById(R.id.tv_request_host) }
     private val et_request_host: EditText? by lazy { findViewById(R.id.et_request_host) }
+    private val tv_path: TextView? by lazy { findViewById(R.id.tv_path) }
     private val et_path: EditText? by lazy { findViewById(R.id.et_path) }
     private val sp_stream_alpn: Spinner? by lazy { findViewById(R.id.sp_stream_alpn) } //uTLS
     private val container_alpn: LinearLayout? by lazy { findViewById(R.id.l4) }
@@ -132,6 +130,7 @@ class ServerActivity : BaseActivity() {
             EConfigType.CUSTOM -> return
             EConfigType.SHADOWSOCKS -> setContentView(R.layout.activity_server_shadowsocks)
             EConfigType.SOCKS -> setContentView(R.layout.activity_server_socks)
+            EConfigType.HTTP -> setContentView(R.layout.activity_server_socks)
             EConfigType.VLESS -> setContentView(R.layout.activity_server_vless)
             EConfigType.TROJAN -> setContentView(R.layout.activity_server_trojan)
             EConfigType.WIREGUARD -> setContentView(R.layout.activity_server_wireguard)
@@ -157,6 +156,36 @@ class ServerActivity : BaseActivity() {
                     et_request_host?.text = Utils.getEditable(transportDetails[1])
                     et_path?.text = Utils.getEditable(transportDetails[2])
                 }
+
+                tv_request_host?.text = Utils.getEditable(
+                    getString(
+                        when (networks[position]) {
+                            "tcp" -> R.string.server_lab_request_host_http
+                            "ws" -> R.string.server_lab_request_host_ws
+                            "httpupgrade" -> R.string.server_lab_request_host_httpupgrade
+                            "splithttp" -> R.string.server_lab_request_host_splithttp
+                            "h2" -> R.string.server_lab_request_host_h2
+                            "quic" -> R.string.server_lab_request_host_quic
+                            "grpc" -> R.string.server_lab_request_host_grpc
+                            else -> R.string.server_lab_request_host
+                        }
+                    )
+                )
+
+                tv_path?.text = Utils.getEditable(
+                    getString(
+                        when (networks[position]) {
+                            "kcp" -> R.string.server_lab_path_kcp
+                            "ws" -> R.string.server_lab_path_ws
+                            "httpupgrade" -> R.string.server_lab_path_httpupgrade
+                            "splithttp" -> R.string.server_lab_path_splithttp
+                            "h2" -> R.string.server_lab_path_h2
+                            "quic" -> R.string.server_lab_path_quic
+                            "grpc" -> R.string.server_lab_path_grpc
+                            else -> R.string.server_lab_path
+                        }
+                    )
+                )
             }
 
             override fun onNothingSelected(parent: AdapterView<*>?) {
@@ -209,7 +238,7 @@ class ServerActivity : BaseActivity() {
     }
 
     /**
-     * bingding seleced server config
+     * binding selected server config
      */
     private fun bindingServer(config: ServerConfig): Boolean {
         val outbound = config.getProxyOutbound() ?: return false
@@ -221,7 +250,9 @@ class ServerActivity : BaseActivity() {
         et_id.text = Utils.getEditable(outbound.getPassword().orEmpty())
         et_alterId?.text =
             Utils.getEditable(outbound.settings?.vnext?.get(0)?.users?.get(0)?.alterId.toString())
-        if (config.configType == EConfigType.SOCKS) {
+        if (config.configType == EConfigType.SOCKS
+            || config.configType == EConfigType.HTTP
+        ) {
             et_security?.text =
                 Utils.getEditable(outbound.settings?.servers?.get(0)?.users?.get(0)?.user.orEmpty())
         } else if (config.configType == EConfigType.VLESS) {
@@ -285,7 +316,7 @@ class ServerActivity : BaseActivity() {
                 tlsSetting.alpn?.let {
                     val alpnIndex = Utils.arrayFind(
                         alpns,
-                        Utils.removeWhiteSpace(tlsSetting.alpn.joinToString())!!
+                        Utils.removeWhiteSpace(tlsSetting.alpn.joinToString()).orEmpty()
                     )
                     sp_stream_alpn?.setSelection(alpnIndex)
                 }
@@ -376,7 +407,10 @@ class ServerActivity : BaseActivity() {
         }
         val config =
             MmkvManager.decodeServerConfig(editGuid) ?: ServerConfig.create(createConfigType)
-        if (config.configType != EConfigType.SOCKS && TextUtils.isEmpty(et_id.text.toString())) {
+        if (config.configType != EConfigType.SOCKS
+            && config.configType != EConfigType.HTTP
+            && TextUtils.isEmpty(et_id.text.toString())
+        ) {
             if (config.configType == EConfigType.TROJAN || config.configType == EConfigType.SHADOWSOCKS) {
                 toast(R.string.server_lab_id3)
             } else {
@@ -413,7 +447,7 @@ class ServerActivity : BaseActivity() {
             saveStreamSettings(it)
         }
         if (config.subscriptionId.isEmpty() && !subscriptionId.isNullOrEmpty()) {
-            config.subscriptionId = subscriptionId!!
+            config.subscriptionId = subscriptionId.orEmpty()
         }
 
         MmkvManager.encodeServerConfig(editGuid, config)
@@ -449,7 +483,7 @@ class ServerActivity : BaseActivity() {
         if (config.configType == EConfigType.SHADOWSOCKS) {
             server.password = et_id.text.toString().trim()
             server.method = shadowsocksSecuritys[sp_security?.selectedItemPosition ?: 0]
-        } else if (config.configType == EConfigType.SOCKS) {
+        } else if (config.configType == EConfigType.SOCKS || config.configType == EConfigType.HTTP) {
             if (TextUtils.isEmpty(et_security?.text) && TextUtils.isEmpty(et_id.text)) {
                 server.users = null
             } else {
@@ -504,7 +538,8 @@ class ServerActivity : BaseActivity() {
             quicSecurity = requestHost,
             key = path,
             mode = transportTypes(networks[network])[type],
-            serviceName = path
+            serviceName = path,
+            authority = requestHost,
         )
         if (sniField.isNotBlank()) {
             sni = sniField
@@ -552,18 +587,23 @@ class ServerActivity : BaseActivity() {
      */
     private fun deleteServer(): Boolean {
         if (editGuid.isNotEmpty()) {
-            if (editGuid != mainStorage?.decodeString(KEY_SELECTED_SERVER)) {
+            if (editGuid != MmkvManager.getSelectServer()) {
                 if (settingsStorage?.decodeBool(AppConfig.PREF_CONFIRM_REMOVE) == true) {
                     AlertDialog.Builder(this).setMessage(R.string.del_config_comfirm)
                         .setPositiveButton(android.R.string.ok) { _, _ ->
                             MmkvManager.removeServer(editGuid)
                             finish()
                         }
+                        .setNegativeButton(android.R.string.no) { _, _ ->
+                            // do nothing
+                        }
                         .show()
                 } else {
                     MmkvManager.removeServer(editGuid)
                     finish()
                 }
+            } else {
+                application.toast(R.string.toast_action_not_allowed)
             }
         }
         return true
