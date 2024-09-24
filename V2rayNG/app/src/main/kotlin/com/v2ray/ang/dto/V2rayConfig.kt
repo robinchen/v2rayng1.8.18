@@ -22,7 +22,9 @@ data class V2rayConfig(
         val transport: Any? = null,
         val reverse: Any? = null,
         var fakedns: Any? = null,
-        val browserForwarder: Any? = null) {
+        val browserForwarder: Any? = null,
+        var observatory: Any? = null,
+        var burstObservatory: Any? = null) {
     companion object {
         const val DEFAULT_PORT = 443
         const val DEFAULT_SECURITY = "auto"
@@ -58,7 +60,8 @@ data class V2rayConfig(
 
         data class SniffingBean(var enabled: Boolean,
                                 val destOverride: ArrayList<String>,
-                                val metadataOnly: Boolean? = null)
+                                val metadataOnly: Boolean? = null,
+                                var routeOnly: Boolean? = null)
     }
 
     data class OutboundBean(var tag: String = "proxy",
@@ -136,6 +139,7 @@ data class V2rayConfig(
                                       var kcpSettings: KcpSettingsBean? = null,
                                       var wsSettings: WsSettingsBean? = null,
                                       var httpupgradeSettings: HttpupgradeSettingsBean? = null,
+                                      var splithttpSettings: SplithttpSettingsBean? = null,
                                       var httpSettings: HttpSettingsBean? = null,
                                       var tlsSettings: TlsSettingsBean? = null,
                                       var quicSettings: QuicSettingBean? = null,
@@ -154,7 +158,7 @@ data class V2rayConfig(
                                            var headers: HeadersBean = HeadersBean(),
                                            val version: String? = null,
                                            val method: String? = null) {
-                        data class HeadersBean(var Host: List<String> = ArrayList(),
+                        data class HeadersBean(var Host: List<String>? = ArrayList(),
                                                @SerializedName("User-Agent")
                                                val userAgent: List<String>? = null,
                                                @SerializedName("Accept-Encoding")
@@ -189,6 +193,10 @@ data class V2rayConfig(
                                                var host: String = "",
                                                val acceptProxyProtocol: Boolean? = null)
 
+            data class SplithttpSettingsBean(var path: String = "",
+                                             var host: String = "",
+                                             val maxUploadSize: Int? = null,
+                                             val maxConcurrentUploads: Int? = null)
             data class HttpSettingsBean(var host: List<String> = ArrayList(),
                                         var path: String = "")
 
@@ -223,10 +231,15 @@ data class V2rayConfig(
             }
 
             data class GrpcSettingsBean(var serviceName: String = "",
-                                        var multiMode: Boolean? = null)
+                                        var authority: String? = null,
+                                        var multiMode: Boolean? = null,
+                                        var idle_timeout: Int? = null,
+                                        var health_check_timeout: Int? = null
+                )
 
             fun populateTransportSettings(transport: String, headerType: String?, host: String?, path: String?, seed: String?,
-                                          quicSecurity: String?, key: String?, mode: String?, serviceName: String?): String {
+                                          quicSecurity: String?, key: String?, mode: String?, serviceName: String?,
+                                          authority: String?): String {
                 var sni = ""
                 network = transport
                 when (network) {
@@ -239,7 +252,7 @@ data class V2rayConfig(
                                 requestObj.headers.Host = (host ?: "").split(",").map { it.trim() }.filter { it.isNotEmpty() }
                                 requestObj.path = (path ?: "").split(",").map { it.trim() }.filter { it.isNotEmpty() }
                                 tcpSetting.header.request = requestObj
-                                sni = requestObj.headers.Host.getOrNull(0) ?: sni
+                                sni = requestObj.headers.Host?.getOrNull(0) ?: sni
                             }
                         } else {
                             tcpSetting.header.type = "none"
@@ -271,6 +284,13 @@ data class V2rayConfig(
                         httpupgradeSetting.path = path ?: "/"
                         httpupgradeSettings = httpupgradeSetting
                     }
+                    "splithttp" -> {
+                        val splithttpSetting = SplithttpSettingsBean()
+                        splithttpSetting.host = host ?: ""
+                        sni = splithttpSetting.host
+                        splithttpSetting.path = path ?: "/"
+                        splithttpSettings = splithttpSetting
+                    }
                     "h2", "http" -> {
                         network = "h2"
                         val h2Setting = HttpSettingsBean()
@@ -290,7 +310,10 @@ data class V2rayConfig(
                         val grpcSetting = GrpcSettingsBean()
                         grpcSetting.multiMode = mode == "multi"
                         grpcSetting.serviceName = serviceName ?: ""
-                        sni = host ?: ""
+                        grpcSetting.authority = authority ?: ""
+                        grpcSetting.idle_timeout = 60
+                        grpcSetting.health_check_timeout = 20
+                        sni = authority ?: ""
                         grpcSettings = grpcSetting
                     }
                 }
@@ -379,7 +402,8 @@ data class V2rayConfig(
         fun getTransportSettingDetails(): List<String>? {
             if (protocol.equals(EConfigType.VMESS.name, true)
                     || protocol.equals(EConfigType.VLESS.name, true)
-                    || protocol.equals(EConfigType.TROJAN.name, true)) {
+                    || protocol.equals(EConfigType.TROJAN.name, true)
+                    || protocol.equals(EConfigType.SHADOWSOCKS.name, true)) {
                 val transport = streamSettings?.network ?: return null
                 return when (transport) {
                     "tcp" -> {
@@ -406,6 +430,12 @@ data class V2rayConfig(
                             httpupgradeSetting.host,
                             httpupgradeSetting.path)
                     }
+                    "splithttp" -> {
+                        val splithttpSetting = streamSettings?.splithttpSettings ?: return null
+                        listOf("",
+                            splithttpSetting.host,
+                            splithttpSetting.path)
+                    }
                     "h2" -> {
                         val h2Setting = streamSettings?.httpSettings ?: return null
                         listOf("",
@@ -421,7 +451,7 @@ data class V2rayConfig(
                     "grpc" -> {
                         val grpcSetting = streamSettings?.grpcSettings ?: return null
                         listOf(if (grpcSetting.multiMode == true) "multi" else "gun",
-                                "",
+                                grpcSetting.authority ?: "",
                                 grpcSetting.serviceName)
                     }
                     else -> null
@@ -450,7 +480,7 @@ data class V2rayConfig(
                            var rules: ArrayList<RulesBean>,
                            val balancers: List<Any>? = null) {
 
-        data class RulesBean(var type: String = "",
+        data class RulesBean(
                              var ip: ArrayList<String>? = null,
                              var domain: ArrayList<String>? = null,
                              var outboundTag: String = "",
@@ -484,7 +514,7 @@ data class V2rayConfig(
 
     fun getProxyOutbound(): OutboundBean? {
         outbounds?.forEach { outbound ->
-            EConfigType.values().forEach {
+            EConfigType.entries.forEach {
                 if (outbound.protocol.equals(it.name, true)) {
                     return outbound
                 }

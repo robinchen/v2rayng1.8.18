@@ -46,8 +46,22 @@
     <string name="server_lab_more_function">底層傳輸方式 (transport)</string>
     <string name="server_lab_head_type">標頭類型</string>
     <string name="server_lab_mode_type">gRPC 傳輸模式 (mode)</string>
-    <string name="server_lab_request_host">要求主機 (host)(host/ws host/httpupgrade host/h2 host)/QUIC 加密方式</string>
-    <string name="server_lab_path">path(ws path/httpupgrade path/h2 path)/QUIC 加密金鑰/kcp seed/gRPC serviceName</string>
+    <string name="server_lab_request_host">要求主機 (host)</string>
+    <string name="server_lab_request_host_http">http host</string>
+    <string name="server_lab_request_host_ws">ws host</string>
+    <string name="server_lab_request_host_httpupgrade">httpupgrade host</string>
+    <string name="server_lab_request_host_splithttp">splithttp host</string>
+    <string name="server_lab_request_host_h2">h2 host</string>
+    <string name="server_lab_request_host_quic">QUIC 加密方式</string>
+    <string name="server_lab_request_host_grpc">gRPC Authority</string>
+    <string name="server_lab_path">path</string>
+    <string name="server_lab_path_ws">ws path</string>
+    <string name="server_lab_path_httpupgrade">httpupgrade path</string>
+    <string name="server_lab_path_splithttp">splithttp path</string>
+    <string name="server_lab_path_h2">h2 path</string>
+    <string name="server_lab_path_quic">QUIC 加密金鑰</string>
+    <string name="server_lab_path_kcp">kcp seed</string>
+    <string name="server_lab_path_grpc">gRPC serviceName</string>
     <string name="server_lab_stream_security">傳輸層安全 (TLS)</string>
     <string name="server_lab_allow_insecure">跳過憑證驗證 (allowInsecure)</string>
     <string name="server_lab_sni">SNI</string>
@@ -80,6 +94,7 @@
     <string name="toast_asset_copy_failed">失敗，請使用檔案總管</string>
     <string name="menu_item_add_file">新增檔案</string>
     <string name="menu_item_download_file">下載檔案</string>
+    <string name="toast_action_not_allowed">禁止此項操作</string>
 
     <!-- PerAppProxyActivity -->
     <string name="title_user_asset_add_url">新增資產網址</string>
@@ -120,6 +135,9 @@
 
     <string name="title_pref_sniffing_enabled">啟用流量監聽</string>
     <string name="summary_pref_sniffing_enabled">從流量中監聽網域 (預設啟用)</string>
+    <string name="title_pref_route_only_enabled">啟用 routeOnly</string>
+    <string name="summary_pref_route_only_enabled">將嗅探得到的網域只用於路由，代理目標位址仍為 IP</string>
+
 
     <string name="title_pref_local_dns_enabled">啟用本機 DNS</string>
     <string name="summary_pref_local_dns_enabled">DNS 請求匯入 core 由 DNS 模塊處理 (建議啟用，如果需要轉送略過區域網路及中國大陸)</string>
@@ -135,13 +153,16 @@
     <string name="title_pref_routing_mode">轉送模式</string>
     <string name="title_pref_routing_custom">自訂轉送</string>
 
-    <string name="title_pref_remote_dns">遠端 DNS (可選)</string>
+    <string name="title_pref_remote_dns">遠端DNS (udp/tcp/https/quic)(可選)</string>
     <string name="summary_pref_remote_dns">DNS</string>
 
     <string name="title_pref_vpn_dns">VPN DNS (僅支援 IPv4/v6)</string>
 
     <string name="title_pref_domestic_dns">國內 DNS (可選)</string>
     <string name="summary_pref_domestic_dns">DNS</string>
+
+    <string name="title_pref_delay_test_url">真連線延遲測試網址 (http/https)</string>
+    <string name="summary_pref_delay_test_url">Url</string>
 
     <string name="title_pref_proxy_sharing_enabled">允許來自區域網路的連線</string>
     <string name="summary_pref_proxy_sharing_enabled">其他裝置可以使用 socks/http 協定透過您的 IP 位址連線到 Proxy，僅在受信任的網路中啟用以避免未經授權的連線</string>
@@ -170,6 +191,13 @@
     <string name="summary_pref_tg_group">加入 Telegram 群組</string>
     <string name="toast_tg_app_not_found">未找到 Telegram 應用程式</string>
     <string name="title_privacy_policy">隱私權政策</string>
+    <string name="title_about">關於</string>
+    <string name="title_source_code">原始碼</string>
+    <string name="title_tg_channel">Telegram 頻道</string>
+    <string name="title_configuration_backup">備份配置</string>
+    <string name="summary_configuration_backup">儲存位置: [%s], 卸載App或清除儲存後備份將被清除</string>
+    <string name="title_configuration_restore">還原配置</string>
+    <string name="title_configuration_share">分享配置</string>
 
     <string name="title_pref_promotion">推廣</string>
     <string name="summary_pref_promotion">一些推廣，輕觸以檢視 (捐贈可去除)</string>
@@ -182,7 +210,8 @@
     <string name="title_mode">模式</string>
     <string name="title_mode_help">輕觸以檢視說明</string>
     <string name="title_language">語言</string>
-    <string name="title_ui_settings">使用者介面設定</string>
+    <string name="title_ui_settings">介面顏色設定</string>
+    <string name="title_pref_ui_mode_night">UI mode settings</string>
 
     <string name="title_logcat">Logcat</string>
     <string name="logcat_copy">複製</string>
@@ -264,6 +293,12 @@
     <string-array name="mode_entries">
         <item>VPN</item>
         <item>僅 Proxy</item>
+    </string-array>
+
+    <string-array name="ui_mode_night">
+        <item>跟隨系統</item>
+        <item>淺色</item>
+        <item>深色</item>
     </string-array>
 
 </resources>

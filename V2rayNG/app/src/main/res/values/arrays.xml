@@ -26,6 +26,7 @@
         <item>kcp</item>
         <item>ws</item>
         <item>httpupgrade</item>
+        <item>splithttp</item>
         <item>h2</item>
         <item>quic</item>
         <item>grpc</item>
@@ -195,5 +196,11 @@
         <item>reject</item>
         <item>allow</item>
         <item>skip</item>
+    </string-array>
+
+    <string-array name="ui_mode_night_value" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
     </string-array>
 </resources>

@@ -106,8 +106,8 @@ object MmkvManager {
         serverAffStorage?.encode(guid, Gson().toJson(aff))
     }
 
-    fun clearAllTestDelayResults() {
-        serverAffStorage?.allKeys()?.forEach { key ->
+    fun clearAllTestDelayResults(keys: List<String>?) {
+        keys?.forEach { key ->
             decodeServerAffiliationInfo(key)?.let { aff ->
                 aff.testDelayMillis = 0
                 serverAffStorage?.encode(key, Gson().toJson(aff))
@@ -172,14 +172,14 @@ object MmkvManager {
     fun removeInvalidServer() {
         serverAffStorage?.allKeys()?.forEach { key ->
             decodeServerAffiliationInfo(key)?.let { aff ->
-                if (aff.testDelayMillis <= 0L) {
+                if (aff.testDelayMillis < 0L) {
                     removeServer(key)
                 }
             }
         }
     }
 
-    fun sortByTestResults( ) {
+    fun sortByTestResults() {
         data class ServerDelay(var guid: String, var testDelayMillis: Long)
 
         val serverDelays = mutableListOf<ServerDelay>()
