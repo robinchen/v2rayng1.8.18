@@ -3,15 +3,6 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-buildscript {
-    repositories{
-	    jcenter()
-	}
-}
-
-repositories {
-	jcenter()
-}
 
 android {
     namespace = "com.v2ray.ang"
