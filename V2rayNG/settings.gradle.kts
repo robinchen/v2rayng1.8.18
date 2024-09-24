@@ -3,15 +3,16 @@ pluginManagement {
         gradlePluginPortal()
         google()
         mavenCentral()
+		jcenter()
     }
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+	    jcenter()
         google()
         mavenCentral()
-        jcenter()
     }
 }
-rootProject.name = "V2rayNG"
+rootProject.name = "v2rayNG"
 include(":app")
