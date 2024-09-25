@@ -129,4 +129,7 @@ dependencies {
     implementation(libs.core)
     implementation(libs.work.runtime.ktx)
     implementation(libs.work.multiprocess)
+	
+	implementation(libs.fabprogresscircle)
+	
 }
